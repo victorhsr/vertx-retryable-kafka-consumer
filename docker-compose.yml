@@ -1,0 +1,111 @@
+version: '3'
+
+networks: 
+  example-network:
+    name: example-network
+    driver: bridge
+
+services:
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:6.0.2
+    networks: 
+      - example-network
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      TZ: America/Recife
+
+  kafka:
+    image: wurstmeister/kafka:2.13-2.7.0
+    networks: 
+      - example-network
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_CREATE_TOPICS: "person-registered-topic:1:1,recs-per-person-registered-topic-RETRY-1:1:1,recs-per-person-registered-topic-RETRY-2:1:1,recs-per-person-registered-topic-RETRY-3:1:1,recs-per-person-registered-topic-DLQ:1:1,recommendations-generated-topic:1:1,recs-gen-recommendations-generated-topic-RETRY-1:1:1,recs-gen-recommendations-generated-topic-RETRY-2:1:1,recs-gen-recommendations-generated-topic-RETRY-3:1:1,recs-gen-recommendations-generated-topic-DLQ:1:1"
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      TZ: America/Recife
+
+  postgres:
+    image: postgres:9.6.21
+    volumes: 
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks: 
+      - example-network
+    ports: 
+      - '5432:5432'
+    environment: 
+      POSTGRES_USER: "admin"
+      POSTGRES_PASSWORD: "admin"
+      TZ: America/Recife
+
+  modules:
+    image: vertx-retryable-kafka-consumer_modules
+    build: 
+      context: ./
+      dockerfile: ./modules/Dockerfile
+
+  catalog:
+    build: 
+      context: ./
+      dockerfile: ./catalog/Dockerfile
+    networks: 
+      - example-network
+    ports: 
+      - '8083:8083'
+    depends_on: 
+      - modules
+      - postgres
+    environment: 
+      profile: prod
+      TZ: America/Recife
+  
+  recommendations-processor-verticle:
+    build: 
+      context: ./
+      dockerfile: ./recommendations-processor-verticle/Dockerfile
+    networks: 
+      - example-network
+    ports: 
+      - '8081:8081'
+    depends_on: 
+      - modules
+      - postgres
+    environment: 
+      profile: prod
+      TZ: America/Recife    
+
+  recommendations:
+    build: 
+      context: ./
+      dockerfile: ./recommendations/Dockerfile
+    networks: 
+      - example-network
+    ports: 
+      - '8082:8082'
+    depends_on: 
+      - modules
+      - kafka
+      - postgres
+    environment: 
+      profile: prod
+      TZ: America/Recife      
+
+  person:
+    build: 
+      context: ./
+      dockerfile: ./person/Dockerfile
+    networks: 
+      - example-network
+    ports: 
+      - '8080:8080'
+    depends_on: 
+      - modules
+      - kafka
+    environment: 
+      profile: prod
+      TZ: America/Recife
