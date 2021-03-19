@@ -12,7 +12,7 @@ Quando um novo usuário é registrado em ___Person___, um evento comunicando sob
 
 ## Sobre a metodologia de _retry_ aplicada
 
-Esta implementação utiliza a estratégia descrita como "Reprocessamento em filas separadas" no [artigo](https://link) em que esse projeto se baseou.
+Esta implementação utiliza a estratégia descrita como "Reprocessamento em filas separadas" no [artigo](https://medium.com/@victorhsr/retries-e-dead-letter-queues-falhando-graciosamente-com-apache-kafka-367141e3cbb) em que esse projeto se baseou.
 
 Nessa estratégia, quando uma mensagem falha, assume-se que a mesma foi consumida com sucesso, realizando o _commit_ do _offset_ do _Kafka Consumer_, dessa forma liberando a fila de processamento que irá para a próxima mensagem. A mensagem problemática é republicada em tópicos de _retry_, onde tem-se um tópico específico para cada tentativa de processamento, então as mensagens irão circular de um tópico para o outro até que sejam processadas corretamente ou a condição de parada for atingida e a mesma seja direcionada para _DLQ_.
 
